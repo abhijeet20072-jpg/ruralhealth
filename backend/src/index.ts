@@ -8,6 +8,7 @@ import patientRoutes from './patient.routes';
 import appointmentRoutes from './appointment.routes';
 import triageRoutes from './triage.routes';
 import recordRoutes from './record.routes';
+import referralRoutes from './referral.routes';
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/triage', triageRoutes);
 app.use('/api/records', recordRoutes);
+app.use('/api/referrals', referralRoutes);
 
 // Only start the server if this script is executed directly (not required in tests)
 if (require.main === module) {

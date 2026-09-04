@@ -123,4 +123,26 @@ db.exec(`
     FOREIGN KEY (doctorId) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (facilityId) REFERENCES facilities(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS referrals (
+    id TEXT PRIMARY KEY,
+    patientId TEXT NOT NULL,
+    referringFacilityId TEXT NOT NULL,
+    receivingFacilityId TEXT NOT NULL,
+    referringDoctorId TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    priority TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'CREATED',
+    supportingInfo TEXT,
+    appointmentId TEXT,
+    followUpNotes TEXT,
+    dueDate DATETIME,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (referringFacilityId) REFERENCES facilities(id) ON DELETE CASCADE,
+    FOREIGN KEY (receivingFacilityId) REFERENCES facilities(id) ON DELETE CASCADE,
+    FOREIGN KEY (referringDoctorId) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (appointmentId) REFERENCES appointments(id) ON DELETE SET NULL
+  );
 `);

@@ -14,6 +14,7 @@ import { Appointments } from './pages/Appointments';
 import { QueueManagement } from './pages/QueueManagement';
 import { Triage } from './pages/Triage';
 import { MedicalRecords } from './pages/MedicalRecords';
+import { ReferralDashboard } from './pages/ReferralDashboard';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { token } = useAuth();
@@ -38,6 +39,7 @@ function AppRoutes() {
       <Route path="/queue" element={<ProtectedRoute><QueueManagement /></ProtectedRoute>} />
       <Route path="/triage" element={<ProtectedRoute><Triage /></ProtectedRoute>} />
       <Route path="/patients/:id/records" element={<ProtectedRoute><MedicalRecords /></ProtectedRoute>} />
+      <Route path="/referrals" element={<ProtectedRoute><ReferralDashboard /></ProtectedRoute>} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>
   );

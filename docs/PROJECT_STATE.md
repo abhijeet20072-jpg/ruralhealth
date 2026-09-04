@@ -1,7 +1,7 @@
 # Project State: Rural Public Healthcare Platform (SIH26133)
 
 **Date Updated:** 2026-09-04  
-**Status:** Longitudinal Digital Medical Record (EHR) Module Complete
+**Status:** Referral Management & Tracking Module Complete
 
 ---
 
@@ -18,16 +18,18 @@ SIH-Healthcare/
 │   │   ├── patient.*          
 │   │   ├── appointment.*      
 │   │   ├── triage.*           
-│   │   ├── record.controller.ts # Electronic Health Records (EHR) engine
-│   │   ├── record.routes.ts   # Protected clinical endpoints
-│   │   ├── record.test.ts     # Boundary testing for global record access
+│   │   ├── record.*           
+│   │   ├── referral.controller.ts # End-to-end referral workflow logic
+│   │   ├── referral.routes.ts   # Protected referral endpoints
+│   │   ├── referral.test.ts     # Boundary testing for referral lifecycle
 │   │   ├── db.ts              
 │   │   └── index.ts           
 │   └── package.json           
 ├── frontend/                  
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── MedicalRecords.tsx # Longitudinal EHR Timeline & Clinical Form
+│   │   │   ├── ReferralDashboard.tsx # Incoming & Outgoing Referral management
+│   │   │   ├── MedicalRecords.tsx 
 │   │   │   ├── Triage.tsx         
 │   │   │   ├── Appointments.tsx   
 │   │   │   ├── QueueManagement.tsx
@@ -63,14 +65,18 @@ SIH-Healthcare/
 * **Patient Registration & Profiles:** Secure Registry, Clinical Authorization lock, Audit Logging.
 * **Appointment & Queue Management:** Booking, Anti-Double-Booking Concurrency Checks.
 * **Digital Triage (CDSS):** Deterministic Rules Engine, Safe Constraints.
-* **Longitudinal Digital Medical Record (EHR):**
-  * **Interoperable Continuity:** Maintains a chronological sequence of clinical interactions for a patient across *all facilities* (Facility-to-facility record sharing for continuity of care).
-  * **Record Types:** `CONSULTATION`, `DIAGNOSIS`, `PRESCRIPTION`, `VITALS`, `INVESTIGATION`, `TREATMENT`, `FOLLOW_UP`.
-  * **Immutable Writes:** Patients cannot modify their records. Only authorized clinical staff explicitly mapped to the writing facility can insert new records.
-  * **Deep Audit Traceability:** Every EHR timeline read and clinical insert is explicitly and immutably captured in `audit_logs` tracking the exact Doctor ID and timestamp.
+* **Longitudinal Digital Medical Record (EHR):** Chronological cross-facility tracking.
+* **Referral Management & Tracking Module:**
+  * **End-to-End Workflow:** Tracks referrals seamlessly from `CREATED` -> `ACCEPTED` -> `SCHEDULED` -> `IN_PROGRESS` -> `COMPLETED`.
+  * **Duplicate Prevention:** Safely blocks creating a duplicate referral if an active one already exists for the same patient at the target facility.
+  * **Overdue Tracking:** Calculates exact `dueDate` thresholds based on priority (`EMERGENCY` = 4hrs, `URGENT` = 48hrs, `ROUTINE` = 14 days). An automated escalation dashboard tracks overdue assignments.
+  * **Strict State Machines:**
+    * *Referring* facility staff can only `CANCEL` an outgoing referral.
+    * *Receiving* facility staff can `ACCEPT`, `REJECT`, or mark `COMPLETED`.
+    * A referral mathematically cannot be marked `COMPLETED` without enforcing mandatory clinical `followUpNotes`.
 
 ## 4. Features That Are Incomplete
-* **Clinical Modules (Advanced):** Teleconsultation (WebRTC), Referral State Machine, Inventory Management.
+* **Clinical Modules (Advanced):** Teleconsultation (WebRTC), Inventory Management.
 * **Production Database Migration:** PostgreSQL + PostGIS schema via TypeORM/Prisma will be required before production.
 
 ## 5. Known Bugs
@@ -78,21 +84,23 @@ SIH-Healthcare/
 
 ## 6. Current Database Status
 * **Status:** Local SQLite schema active.
-* **Details:** `users`, `facilities`, `facility_staff`, `patients`, `audit_logs`, `appointments`, `triage_assessments`, and `medical_records` tables. 
+* **Details:** `users`, `facilities`, `facility_staff`, `patients`, `audit_logs`, `appointments`, `triage_assessments`, `medical_records`, and `referrals` tables. 
 
 ## 7. Current API Status
-* **Status:** Auth, Facility, Patient, Appointment, Triage, and Medical Record modules complete.
-* **Active EHR Endpoints:** 
-  * `POST /api/records` (Clinical record insert)
-  * `GET /api/records/patient/:patientId` (Longitudinal Timeline Fetch)
+* **Status:** Auth, Facility, Patient, Appointment, Triage, EHR, and Referral modules complete.
+* **Active Referral Endpoints:** 
+  * `POST /api/referrals`
+  * `PUT /api/referrals/:id/status`
+  * `GET /api/referrals/dashboard`
+  * `GET /api/referrals/overdue`
 
 ## 8. Current Frontend Status
 * **Status:** Routing, Auth Context, and Views complete.
-* **Details:** Added `MedicalRecords.tsx` providing a visual chronological timeline of patient history and an active append form for clinical staff.
+* **Details:** Added `ReferralDashboard.tsx` for facility staff to actively track and interact with Incoming and Outgoing transfers.
 
 ## 9. Current Testing Status
 * **Status:** Robust coverage for all modules.
-* **Details:** Backend `record.test.ts` executes 6 deep edge cases (Unauthorized mutation rejection, invalid payload blocking, unassigned facility block, successful write, chronological facility-to-facility cross-read, and deep audit log integrity check). Total 100% pass rate.
+* **Details:** Backend `referral.test.ts` executes 8 deep edge cases (Network failure simulation, unassigned facility block, missing facility failure, complete lifecycle passing, forced follow-up notes validation, rejection tracking, cancellation tracking, duplicate prevention, and overdue tracking). Total 100% pass rate.
 
 ## 10. Deployment Status
 * **Status:** Local developer containerization.
