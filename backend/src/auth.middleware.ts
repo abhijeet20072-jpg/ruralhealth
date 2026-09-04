@@ -8,19 +8,23 @@ export interface AuthRequest extends Request {
     id: string;
     username: string;
     role: string;
+    facilityId?: string;
+    patientId?: string;
   };
 }
 
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction): void => {
   const authHeader = req.headers.authorization;
+  
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Unauthorized: No token provided' });
     return;
   }
 
   const token = authHeader.split(' ')[1];
+  
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; username: string; role: string };
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
     req.user = decoded;
     next();
   } catch (err) {
@@ -38,3 +42,8 @@ export const authorizeRoles = (...roles: string[]) => {
     next();
   };
 };
+
+export const clinicalAuth = [
+  authenticate,
+  authorizeRoles('ROLE_DOCTOR_MO', 'ROLE_HEALTH_WORKER', 'ROLE_DISTRICT_ADMIN')
+];

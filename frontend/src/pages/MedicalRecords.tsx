@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useConnectivity } from '../context/ConnectivityContext';
 
 export const MedicalRecords: React.FC = () => {
   const { id } = useParams<{ id: string }>(); // Patient ID
   const { user } = useAuth();
+  const { isOnline, enqueueOperation } = useConnectivity();
   const [timeline, setTimeline] = useState<any[]>([]);
   const [error, setError] = useState('');
   
@@ -13,8 +15,8 @@ export const MedicalRecords: React.FC = () => {
   const [recordType, setRecordType] = useState('CONSULTATION');
   const [notes, setNotes] = useState('');
   
-  // Facility mocking for scaffolding
-  const facilityId = 'demo-facility-id'; 
+  
+  const facilityId = user?.facilityId; 
 
   const fetchTimeline = async () => {
     try {
@@ -32,12 +34,17 @@ export const MedicalRecords: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/records', {
-        patientId: id,
-        facilityId,
-        recordType,
-        notes
-      });
+      if (isOnline) {
+        await api.post('/records', { patientId: id, facilityId, recordType, notes });
+      } else {
+        await enqueueOperation({
+          id: crypto.randomUUID(),
+          type: 'CREATE_MEDICAL_RECORD',
+          payload: { patientId: id, recordType, notes },
+          timestamp: new Date().toISOString()
+        });
+        alert('Offline mode: Record saved locally and queued for sync');
+      }
       setNotes('');
       fetchTimeline(); // Refresh timeline
     } catch (err: any) {

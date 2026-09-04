@@ -1,26 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export const QueueManagement: React.FC = () => {
+  const { user } = useAuth();
   const [queue, setQueue] = useState<any[]>([]);
   const [error, setError] = useState('');
   
-  const facilityId = 'demo-facility-id'; // In real app, tied to logged-in MO/Staff
+  const facilityId = user?.facilityId;
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
   const fetchQueue = async () => {
+    if (!facilityId) return;
     try {
-      // Dummy fetch to satisfy UI scaffolding
       const res = await api.get(`/appointments/queue?facilityId=${facilityId}&date=${today}`);
       setQueue(res.data.queue || []);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load queue. Note: Using mocked facility ID for scaffolding.');
+      setError(err.response?.data?.error || 'Failed to load queue.');
     }
   };
 
   useEffect(() => {
-    fetchQueue();
-  }, []);
+    if (facilityId) fetchQueue();
+    else setError('You are not assigned to any facility. Please contact administration.');
+  }, [facilityId]);
 
   const updateStatus = async (id: string, newStatus: string) => {
     try {

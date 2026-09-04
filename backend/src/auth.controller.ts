@@ -8,13 +8,9 @@ import crypto from 'crypto';
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_for_development_only_12345';
 
 const registerSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters").max(50),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum([
-    'ROLE_CITIZEN', 'ROLE_ASHA', 'ROLE_ANM', 'ROLE_CHO', 
-    'ROLE_DOCTOR_MO', 'ROLE_SPECIALIST', 'ROLE_LAB_TECH', 
-    'ROLE_PHARMACIST', 'ROLE_FACILITY_ADMIN', 'ROLE_DISTRICT_ADMIN'
-  ]).default('ROLE_CITIZEN')
+  username: z.string().min(3).max(50),
+  password: z.string().min(6),
+  role: z.string().default('ROLE_CITIZEN')
 });
 
 const loginSchema = z.object({
@@ -22,11 +18,25 @@ const loginSchema = z.object({
   password: z.string()
 });
 
+const enrichUser = (user: any) => {
+  const result: any = { id: user.id, username: user.username, role: user.role };
+  if (user.role !== 'ROLE_CITIZEN') {
+    const mapping = db.prepare('SELECT facilityId FROM facility_staff WHERE userId = ?').get(user.id) as any;
+    if (mapping) result.facilityId = mapping.facilityId;
+  } else {
+    // Check if citizen is linked to a patient profile
+    // Catch if column doesn't exist yet via try-catch to avoid breaking
+    try {
+      const p = db.prepare('SELECT id FROM patients WHERE userId = ?').get(user.id) as any;
+      if (p) result.patientId = p.id;
+    } catch(e) {}
+  }
+  return result;
+};
+
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const parsed = registerSchema.parse(req.body);
-    
-    // Check duplicate
     const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(parsed.username);
     if (existing) {
       res.status(400).json({ error: 'Username already exists' });
@@ -37,23 +47,17 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const passwordHash = await bcrypt.hash(parsed.password, salt);
     const id = crypto.randomUUID();
 
-    db.prepare('INSERT INTO users (id, username, passwordHash, role) VALUES (?, ?, ?, ?)')
-      .run(id, parsed.username, passwordHash, parsed.role);
+    db.prepare('INSERT INTO users (id, username, passwordHash, role) VALUES (?, ?, ?, ?)').run(id, parsed.username, passwordHash, parsed.role);
 
     res.status(201).json({ message: 'User registered successfully', userId: id });
   } catch (err: any) {
-    if (err instanceof z.ZodError) {
-      res.status(400).json({ error: err.errors[0].message });
-    } else {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    res.status(400).json({ error: 'Invalid data' });
   }
 };
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const parsed = loginSchema.parse(req.body);
-
     const user: any = db.prepare('SELECT * FROM users WHERE username = ?').get(parsed.username);
     if (!user) {
       res.status(401).json({ error: 'Invalid credentials' });
@@ -66,27 +70,25 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+    const enriched = enrichUser(user);
+    const token = jwt.sign(enriched, JWT_SECRET, { expiresIn: '1d' });
 
-    res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
+    res.json({ token, user: enriched });
   } catch (err: any) {
-    if (err instanceof z.ZodError) {
-      res.status(400).json({ error: err.errors[0].message });
-    } else {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    res.status(400).json({ error: 'Invalid data' });
   }
 };
 
 export const me = (req: any, res: Response): void => {
-  res.json({ user: req.user });
+  // Try to enrich it fresh
+  const user: any = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  res.json({ user: enrichUser(user) });
 };
 
 export const logout = (req: Request, res: Response): void => {
-  // Stateless JWT: client deletes token. We just acknowledge.
   res.json({ message: 'Logged out successfully' });
 };

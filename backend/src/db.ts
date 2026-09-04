@@ -5,12 +5,12 @@ const dbPath = process.env.NODE_ENV === 'test'
   ? path.resolve(__dirname, '../test.db')
   : path.resolve(__dirname, '../dev.db');
 
+  
+
 export const db = new Database(dbPath);
 
-// Enable foreign keys
 db.pragma('foreign_keys = ON');
 
-// Initialize schema
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -46,6 +46,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS patients (
     id TEXT PRIMARY KEY,
+    userId TEXT UNIQUE,
     abhaId TEXT UNIQUE,
     firstName TEXT NOT NULL,
     lastName TEXT NOT NULL,
@@ -58,7 +59,16 @@ db.exec(`
     bloodGroup TEXT,
     allergies TEXT,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS processed_operations (
+    id TEXT PRIMARY KEY,
+    userId TEXT NOT NULL,
+    entityType TEXT NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
   );
 
   CREATE TABLE IF NOT EXISTS audit_logs (
@@ -143,6 +153,31 @@ db.exec(`
     FOREIGN KEY (referringFacilityId) REFERENCES facilities(id) ON DELETE CASCADE,
     FOREIGN KEY (receivingFacilityId) REFERENCES facilities(id) ON DELETE CASCADE,
     FOREIGN KEY (referringDoctorId) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (appointmentId) REFERENCES appointments(id) ON DELETE SET NULL
+  );
+`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS teleconsultations (
+    id TEXT PRIMARY KEY,
+    patientId TEXT NOT NULL,
+    doctorId TEXT NOT NULL,
+    facilityId TEXT NOT NULL,
+    appointmentId TEXT,
+    status TEXT NOT NULL DEFAULT 'REQUESTED',
+    consultationType TEXT NOT NULL DEFAULT 'LIVE',
+    scheduledAt DATETIME,
+    startedAt DATETIME,
+    endedAt DATETIME,
+    reason TEXT NOT NULL,
+    priority TEXT NOT NULL DEFAULT 'ROUTINE',
+    clinicalNotes TEXT,
+    consentGranted BOOLEAN DEFAULT 0,
+    cancellationReason TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE,
+    FOREIGN KEY (doctorId) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (facilityId) REFERENCES facilities(id) ON DELETE CASCADE,
     FOREIGN KEY (appointmentId) REFERENCES appointments(id) ON DELETE SET NULL
   );
 `);

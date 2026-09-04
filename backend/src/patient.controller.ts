@@ -33,15 +33,17 @@ export const registerPatient = (req: AuthRequest, res: Response): void => {
     }
 
     const id = crypto.randomUUID();
+    const isCitizen = req.user!.role === 'ROLE_CITIZEN';
 
     db.prepare(`
       INSERT INTO patients 
-      (id, abhaId, firstName, lastName, dateOfBirth, gender, phoneNumber, address, emergencyContactName, emergencyContactPhone, bloodGroup, allergies) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, abhaId, firstName, lastName, dateOfBirth, gender, phoneNumber, address, emergencyContactName, emergencyContactPhone, bloodGroup, allergies, userId) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, parsed.abhaId || null, parsed.firstName, parsed.lastName, parsed.dateOfBirth, parsed.gender,
       parsed.phoneNumber || null, parsed.address || null, parsed.emergencyContactName || null, 
-      parsed.emergencyContactPhone || null, parsed.bloodGroup || null, JSON.stringify(parsed.allergies)
+      parsed.emergencyContactPhone || null, parsed.bloodGroup || null, JSON.stringify(parsed.allergies),
+      isCitizen ? userId : null
     );
 
     logAudit(userId, 'REGISTER_PATIENT', id, { abhaId: parsed.abhaId });
@@ -61,9 +63,14 @@ export const updatePatient = (req: AuthRequest, res: Response): void => {
     const userId = req.user!.id;
     const parsed = patientSchema.partial().parse(req.body);
 
-    const patient = db.prepare('SELECT * FROM patients WHERE id = ?').get(id);
+    const patient: any = db.prepare('SELECT * FROM patients WHERE id = ?').get(id);
     if (!patient) {
       res.status(404).json({ error: 'Patient not found' });
+      return;
+    }
+
+    if (req.user!.role === 'ROLE_CITIZEN' && patient.userId !== userId) {
+      res.status(403).json({ error: 'Forbidden' });
       return;
     }
 
@@ -99,21 +106,24 @@ export const searchPatients = (req: AuthRequest, res: Response): void => {
     const { query } = req.query;
     const userId = req.user!.id;
     
-    // Using a simplistic search for sqlite MVP.
     let patients: any[] = [];
-    if (query) {
-      const lowerQuery = `%${String(query).toLowerCase()}%`;
-      patients = db.prepare(`
-        SELECT id, abhaId, firstName, lastName, dateOfBirth, gender, phoneNumber
-        FROM patients 
-        WHERE LOWER(firstName) LIKE ? 
-           OR LOWER(lastName) LIKE ? 
-           OR abhaId LIKE ? 
-           OR phoneNumber LIKE ?
-        LIMIT 50
-      `).all(lowerQuery, lowerQuery, lowerQuery, lowerQuery);
+    if (req.user!.role === 'ROLE_CITIZEN') {
+      patients = db.prepare(`SELECT id, abhaId, firstName, lastName, dateOfBirth, gender, phoneNumber FROM patients WHERE userId = ?`).all(userId);
     } else {
-      patients = db.prepare(`SELECT id, abhaId, firstName, lastName, dateOfBirth, gender, phoneNumber FROM patients LIMIT 50`).all();
+      if (query) {
+        const lowerQuery = `%${String(query).toLowerCase()}%`;
+        patients = db.prepare(`
+          SELECT id, abhaId, firstName, lastName, dateOfBirth, gender, phoneNumber
+          FROM patients 
+          WHERE LOWER(firstName) LIKE ? 
+             OR LOWER(lastName) LIKE ? 
+             OR abhaId LIKE ? 
+             OR phoneNumber LIKE ?
+          LIMIT 50
+        `).all(lowerQuery, lowerQuery, lowerQuery, lowerQuery);
+      } else {
+        patients = db.prepare(`SELECT id, abhaId, firstName, lastName, dateOfBirth, gender, phoneNumber FROM patients LIMIT 50`).all();
+      }
     }
 
     logAudit(userId, 'SEARCH_PATIENTS', undefined, { query });
@@ -132,6 +142,11 @@ export const getPatientDetails = (req: AuthRequest, res: Response): void => {
     
     if (!patient) {
       res.status(404).json({ error: 'Patient not found' });
+      return;
+    }
+
+    if (req.user!.role === 'ROLE_CITIZEN' && patient.userId !== userId) {
+      res.status(403).json({ error: 'Forbidden' });
       return;
     }
 

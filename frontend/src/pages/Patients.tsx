@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 
 export const Patients: React.FC = () => {
-  const { user } = useAuth();
+   
   const [patients, setPatients] = useState<any[]>([]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');

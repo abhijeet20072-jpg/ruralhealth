@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
+import { useParams } from 'react-router-dom';
+import { useConnectivity } from '../context/ConnectivityContext';
 
 export const Triage: React.FC = () => {
-  const patientId = 'demo-patient-id'; // Mocked for UI scaffolding
+  const { id: patientId } = useParams<{ id: string }>();
+  const { isOnline, enqueueOperation } = useConnectivity();
 
   const [formData, setFormData] = useState({
     temperature: '', heartRate: '', spO2: '', systolicBp: '', diastolicBp: '',
@@ -31,8 +34,28 @@ export const Triage: React.FC = () => {
         riskFactors: formData.riskFactors.split(',').map(s => s.trim()).filter(s => s)
       };
 
-      const res = await api.post('/triage/assess', payload);
-      setResult(res.data);
+      if (isOnline) {
+        const res = await api.post('/triage/assess', payload);
+        setResult(res.data);
+      } else {
+        // Enqueue the payload directly (it already has patientId)
+        // Note: the backend sync endpoint accepts string symptoms not arrays, so let's format it for sync
+        await enqueueOperation({
+          id: crypto.randomUUID(),
+          type: 'CREATE_TRIAGE',
+          payload: { 
+            patientId,
+            vitals: JSON.stringify(payload.vitals),
+            symptoms: formData.symptoms,
+            riskFactors: formData.riskFactors,
+            urgencyLevel: 'ROUTINE', // fallback, backend overrides if CDSS applies on sync
+            recommendedAction: 'To be reviewed by clinician upon sync',
+            referralNeeded: false
+          },
+          timestamp: new Date().toISOString()
+        });
+        alert('Offline mode: Triage assessment saved locally and queued for remote CDSS sync');
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to complete triage. Note: UI assumes valid patientId binding.');
     }

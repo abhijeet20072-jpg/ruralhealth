@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export const ReferralDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'INCOMING' | 'OUTGOING'>('INCOMING');
   const [referrals, setReferrals] = useState<any[]>([]);
   const [error, setError] = useState('');
 
-  const facilityId = 'demo-facility-id'; // Mock facility binding
+  const { user } = useAuth();
+  const facilityId = user?.facilityId;
 
   const fetchDashboard = async () => {
     try {
@@ -18,7 +20,7 @@ export const ReferralDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchDashboard();
+    if (facilityId) fetchDashboard(); else setError('You must be assigned to a facility to view referrals.');
   }, [activeTab]);
 
   const updateStatus = async (id: string, newStatus: string) => {
@@ -29,7 +31,7 @@ export const ReferralDashboard: React.FC = () => {
         if (!payload.followUpNotes) return; // Cancelled
       }
       await api.put(`/referrals/${id}/status`, payload);
-      fetchDashboard();
+      if (facilityId) fetchDashboard(); else setError('You must be assigned to a facility to view referrals.');
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to update status');
     }

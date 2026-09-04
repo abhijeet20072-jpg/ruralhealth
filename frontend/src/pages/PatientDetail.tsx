@@ -23,7 +23,8 @@ export const PatientDetail: React.FC = () => {
         <Link to={`/patients/${id}/edit`} className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">
           Edit Profile</Link>
         <Link to={`/patients/${id}/records`} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 ml-2">
-          View EHR Timeline
+          View EHR Timeline</Link>
+        <Link to={`/patients/${id}/triage`} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 ml-2">Run Triage
         </Link>
       </div>
       
