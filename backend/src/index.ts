@@ -3,6 +3,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import authRoutes from './auth.routes';
+import facilityRoutes from './facility.routes';
+import patientRoutes from './patient.routes';
+import appointmentRoutes from './appointment.routes';
+import triageRoutes from './triage.routes';
+import recordRoutes from './record.routes';
 
 dotenv.config();
 
@@ -22,6 +27,11 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/facilities', facilityRoutes);
+app.use('/api/patients', patientRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/triage', triageRoutes);
+app.use('/api/records', recordRoutes);
 
 // Only start the server if this script is executed directly (not required in tests)
 if (require.main === module) {
