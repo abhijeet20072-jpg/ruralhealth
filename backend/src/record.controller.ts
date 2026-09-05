@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from './db';
+import { hasLegitimateCareRelationship } from './auth.utils';
 import crypto from 'crypto';
 import { AuthRequest } from './auth.middleware';
 import { logAudit } from './audit';
@@ -49,7 +50,7 @@ export const createMedicalRecord = (req: AuthRequest, res: Response): void => {
     res.status(201).json({ message: 'Medical record created successfully', recordId: id });
   } catch (err: any) {
     if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Invalid input data', details: err.errors });
+      res.status(400).json({ error: 'Invalid input data', details: err.issues });
     } else {
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -60,6 +61,21 @@ export const getPatientTimeline = (req: AuthRequest, res: Response): void => {
   try {
     const patientId = req.params.patientId;
     const userId = req.user!.id;
+
+    if (req.user!.role === 'ROLE_CITIZEN') {
+      const citizenPatientRecord: any = db.prepare('SELECT id FROM patients WHERE userId = ?').get(req.user!.id);
+      if (!citizenPatientRecord || citizenPatientRecord.id !== patientId) {
+        res.status(403).json({ error: 'Unauthorized to view this timeline' });
+        return;
+      }
+    } else if (req.user!.role !== 'ROLE_DISTRICT_ADMIN') {
+      const facilityId = req.user!.facilityId;
+      if (!facilityId || !hasLegitimateCareRelationship(patientId, facilityId)) {
+        res.status(403).json({ error: 'Unauthorized: No active care relationship with this patient at your facility' });
+        return;
+      }
+    }
+
 
     // Cross-facility lookup is intentionally supported for continuity of care.
     // Ensure patient exists

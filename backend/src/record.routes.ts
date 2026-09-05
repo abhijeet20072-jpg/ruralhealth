@@ -12,6 +12,6 @@ const clinicalStaff = ['ROLE_ASHA', 'ROLE_ANM', 'ROLE_CHO', 'ROLE_DOCTOR_MO', 'R
 router.post('/', authenticate, authorizeRoles(...clinicalStaff), createMedicalRecord);
 
 // Reading the longitudinal timeline
-router.get('/patient/:patientId', authenticate, authorizeRoles(...clinicalStaff), getPatientTimeline);
+router.get('/patient/:patientId', authenticate, authorizeRoles('ROLE_CITIZEN', 'ROLE_ASHA', 'ROLE_ANM', 'ROLE_CHO', 'ROLE_DOCTOR_MO', 'ROLE_SPECIALIST'), getPatientTimeline);
 
 export default router;

@@ -10,6 +10,12 @@ import triageRoutes from './triage.routes';
 import recordRoutes from './record.routes';
 import referralRoutes from './referral.routes';
 import teleconsultationRoutes from './teleconsultation.routes';
+import consultationRoutes from './consultation.routes';
+import diagnosticRoutes from './diagnostic.routes';
+import medicineRoutes from './medicine.routes';
+import notificationRoutes from './notification.routes';
+import emergencyRoutes from './emergency.routes';
+import careManagementRoutes from './care_management.routes';
 import { processSync } from './sync.controller';
 import { clinicalAuth } from './auth.middleware';
 
@@ -37,6 +43,12 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/triage', triageRoutes);
 app.use('/api/records', recordRoutes);
 app.use('/api/referrals', referralRoutes);
+app.use('/api/consultation', consultationRoutes);
+app.use('/api/diagnostics', diagnosticRoutes);
+app.use('/api/medicines', medicineRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/emergencies', emergencyRoutes);
+app.use('/api/care-plans', careManagementRoutes);
 app.use('/api/teleconsultations', teleconsultationRoutes);
 app.post('/api/sync', clinicalAuth, processSync);
 

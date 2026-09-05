@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from './db';
+import { hasLegitimateCareRelationship } from './auth.utils';
 import crypto from 'crypto';
 import { AuthRequest } from './auth.middleware';
 import { evaluateTriage } from './triage.rules';
@@ -66,7 +67,7 @@ export const createAssessment = (req: AuthRequest, res: Response): void => {
 
   } catch (err: any) {
     if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Invalid input data', details: err.errors });
+      res.status(400).json({ error: 'Invalid input data', details: err.issues });
     } else {
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -76,6 +77,21 @@ export const createAssessment = (req: AuthRequest, res: Response): void => {
 export const getPatientAssessments = (req: AuthRequest, res: Response): void => {
   try {
     const patientId = req.params.patientId;
+    
+    if (req.user!.role === 'ROLE_CITIZEN') {
+      const citizenPatientRecord: any = db.prepare('SELECT id FROM patients WHERE userId = ?').get(req.user!.id);
+      if (!citizenPatientRecord || citizenPatientRecord.id !== patientId) {
+        res.status(403).json({ error: 'Unauthorized to access this triage data' });
+        return;
+      }
+    } else if (req.user!.role !== 'ROLE_DISTRICT_ADMIN') {
+      const facilityId = req.user!.facilityId;
+      if (!facilityId || !hasLegitimateCareRelationship(patientId, facilityId)) {
+        res.status(403).json({ error: 'Unauthorized: No active care relationship with this patient at your facility' });
+        return;
+      }
+    }
+
     const assessments = db.prepare(`
       SELECT t.*, u.username as assessedByName
       FROM triage_assessments t

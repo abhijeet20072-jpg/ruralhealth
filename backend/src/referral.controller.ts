@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from './db';
+import { hasLegitimateCareRelationship } from './auth.utils';
 import crypto from 'crypto';
 import { AuthRequest } from './auth.middleware';
 import { logAudit } from './audit';
+import { createNotification } from './notification.service';
 
 const ACTIVE_STATUSES = ['CREATED', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS'];
 const TERMINAL_STATUSES = ['COMPLETED', 'CANCELLED', 'REJECTED'];
@@ -71,7 +73,7 @@ export const createReferral = (req: AuthRequest, res: Response): void => {
     res.status(201).json({ message: 'Referral created', referralId: id });
   } catch (err: any) {
     if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Invalid input data', details: err.errors });
+      res.status(400).json({ error: 'Invalid input data', details: err.issues });
     } else {
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -182,6 +184,38 @@ export const getOverdueReferrals = (req: AuthRequest, res: Response): void => {
     const overdue = db.prepare(query).all(...ACTIVE_STATUSES);
     res.json({ overdue });
   } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const getPatientReferrals = (req: AuthRequest, res: Response): void => {
+  try {
+    const patientId = req.params.patientId;
+    const userId = req.user!.id;
+
+    if (req.user!.role === 'ROLE_CITIZEN') {
+      const citizenPatientRecord: any = db.prepare('SELECT id FROM patients WHERE userId = ?').get(userId);
+      if (!citizenPatientRecord || citizenPatientRecord.id !== patientId) {
+        res.status(403).json({ error: 'Unauthorized to view these referrals' }); return;
+      }
+    } else if (req.user!.role !== 'ROLE_DISTRICT_ADMIN') {
+      const facilityId = req.user!.facilityId;
+      if (!facilityId || !hasLegitimateCareRelationship(patientId, facilityId)) {
+        res.status(403).json({ error: 'Unauthorized: No active care relationship' }); return;
+      }
+    }
+
+    const referrals = db.prepare(`
+      SELECT r.*, f_ref.name as referringName, f_rec.name as receivingName 
+      FROM referrals r
+      JOIN facilities f_ref ON r.referringFacilityId = f_ref.id
+      JOIN facilities f_rec ON r.receivingFacilityId = f_rec.id
+      WHERE r.patientId = ?
+      ORDER BY r.createdAt DESC
+    `).all(patientId);
+
+    res.json({ referrals });
+  } catch (err: any) {
     res.status(500).json({ error: 'Internal server error' });
   }
 };

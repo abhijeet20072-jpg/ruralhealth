@@ -11,8 +11,8 @@ beforeAll(async () => {
   db.exec('DELETE FROM triage_assessments; DELETE FROM patients; DELETE FROM users;');
   
   // Create clinical worker
-  await request(app).post('/api/auth/register').send({ username: 'asha1', password: 'password123', role: 'ROLE_ASHA' });
-  ashaToken = (await request(app).post('/api/auth/login').send({ username: 'asha1', password: 'password123' })).body.token;
+  await request(app).post('/api/auth/__test_provision').send({ username: 'asha1', password: 'StrongP@ssw0rd!', role: 'ROLE_ASHA' });
+  ashaToken = (await request(app).post('/api/auth/login').send({ username: 'asha1', password: 'StrongP@ssw0rd!' })).body.token;
 
   // Create Patient
   patientId = crypto.randomUUID();

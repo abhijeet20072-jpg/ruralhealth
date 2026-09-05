@@ -16,16 +16,16 @@ beforeAll(async () => {
   db.exec('DELETE FROM medical_records; DELETE FROM audit_logs; DELETE FROM facility_staff; DELETE FROM facilities; DELETE FROM patients; DELETE FROM users;');
   
   // Register Users
-  await request(app).post('/api/auth/register').send({ username: 'doc1', password: 'password123', role: 'ROLE_DOCTOR_MO' });
-  doctor1Token = (await request(app).post('/api/auth/login').send({ username: 'doc1', password: 'password123' })).body.token;
+  await request(app).post('/api/auth/__test_provision').send({ username: 'doc1', password: 'StrongP@ssw0rd!', role: 'ROLE_DOCTOR_MO' });
+  doctor1Token = (await request(app).post('/api/auth/login').send({ username: 'doc1', password: 'StrongP@ssw0rd!' })).body.token;
   const doc1Id = db.prepare("SELECT id FROM users WHERE username = 'doc1'").get().id;
 
-  await request(app).post('/api/auth/register').send({ username: 'doc2', password: 'password123', role: 'ROLE_SPECIALIST' });
-  doctor2Token = (await request(app).post('/api/auth/login').send({ username: 'doc2', password: 'password123' })).body.token;
+  await request(app).post('/api/auth/__test_provision').send({ username: 'doc2', password: 'StrongP@ssw0rd!', role: 'ROLE_SPECIALIST' });
+  doctor2Token = (await request(app).post('/api/auth/login').send({ username: 'doc2', password: 'StrongP@ssw0rd!' })).body.token;
   const doc2Id = db.prepare("SELECT id FROM users WHERE username = 'doc2'").get().id;
 
-  await request(app).post('/api/auth/register').send({ username: 'cit1', password: 'password123', role: 'ROLE_CITIZEN' });
-  citizenToken = (await request(app).post('/api/auth/login').send({ username: 'cit1', password: 'password123' })).body.token;
+  await request(app).post('/api/auth/__test_provision').send({ username: 'cit1', password: 'StrongP@ssw0rd!', role: 'ROLE_CITIZEN' });
+  citizenToken = (await request(app).post('/api/auth/login').send({ username: 'cit1', password: 'StrongP@ssw0rd!' })).body.token;
 
   // Facilities
   facility1Id = crypto.randomUUID();
@@ -36,10 +36,12 @@ beforeAll(async () => {
   // Mappings
   db.prepare(`INSERT INTO facility_staff (facilityId, userId) VALUES (?, ?)`).run(facility1Id, doc1Id);
   db.prepare(`INSERT INTO facility_staff (facilityId, userId) VALUES (?, ?)`).run(facility2Id, doc2Id);
+  doctor1Token = (await request(app).post('/api/auth/login').send({ username: 'doc1', password: 'StrongP@ssw0rd!' })).body.token;
+  doctor2Token = (await request(app).post('/api/auth/login').send({ username: 'doc2', password: 'StrongP@ssw0rd!' })).body.token;
 
   // Patient
   patientId = crypto.randomUUID();
-  db.prepare(`INSERT INTO patients (id, firstName, lastName, dateOfBirth, gender) VALUES (?, 'Test', 'Patient', '1990-01-01', 'MALE')`).run(patientId);
+  const cit = db.prepare("SELECT id FROM users WHERE username = 'cit1'").get(); db.prepare(`INSERT INTO patients (id, userId, firstName, lastName, dateOfBirth, gender) VALUES (?, ?, 'Test', 'Patient', '1990-01-01', 'MALE')`).run(patientId, cit.id);
 });
 
 describe('Longitudinal Medical Record Module', () => {
@@ -51,7 +53,8 @@ describe('Longitudinal Medical Record Module', () => {
     });
     expect(res.status).toBe(403);
     // Read
-    res = await request(app).get(`/api/records/patient/${patientId}`).set('Authorization', `Bearer ${citizenToken}`);
+    const otherPatientId = crypto.randomUUID();
+    res = await request(app).get(`/api/records/patient/${otherPatientId}`).set('Authorization', `Bearer ${citizenToken}`);
     expect(res.status).toBe(403);
   });
 

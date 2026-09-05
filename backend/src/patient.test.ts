@@ -11,20 +11,20 @@ beforeAll(async () => {
   db.exec('DELETE FROM audit_logs; DELETE FROM patients; DELETE FROM users;');
   
   // Create Clinical User (ASHA)
-  await request(app).post('/api/auth/register').send({
-    username: 'asha_worker', password: 'password123', role: 'ROLE_ASHA'
+  await request(app).post('/api/auth/__test_provision').send({
+    username: 'asha_worker', password: 'StrongP@ssw0rd!', role: 'ROLE_ASHA'
   });
   const clinicalRes = await request(app).post('/api/auth/login').send({
-    username: 'asha_worker', password: 'password123'
+    username: 'asha_worker', password: 'StrongP@ssw0rd!'
   });
   clinicalToken = clinicalRes.body.token;
 
   // Create Citizen
-  await request(app).post('/api/auth/register').send({
-    username: 'citizen_joe', password: 'password123', role: 'ROLE_CITIZEN'
+  await request(app).post('/api/auth/__test_provision').send({
+    username: 'citizen_joe', password: 'StrongP@ssw0rd!', role: 'ROLE_CITIZEN'
   });
   const citizenRes = await request(app).post('/api/auth/login').send({
-    username: 'citizen_joe', password: 'password123'
+    username: 'citizen_joe', password: 'StrongP@ssw0rd!'
   });
   citizenToken = citizenRes.body.token;
 });

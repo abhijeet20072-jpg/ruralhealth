@@ -13,7 +13,7 @@ const clinicalStaff = ['ROLE_ASHA', 'ROLE_ANM', 'ROLE_CHO', 'ROLE_DOCTOR_MO', 'R
 router.get('/availability', getDoctorAvailability);
 router.post('/book', authenticate, bookAppointment);
 router.put('/:id/cancel', authenticate, cancelAppointment);
-router.get('/patient/:patientId', authenticate, getPatientHistory);
+router.get('/patient/:patientId', authenticate, authorizeRoles('ROLE_CITIZEN', 'ROLE_ASHA', 'ROLE_ANM', 'ROLE_CHO', 'ROLE_DOCTOR_MO', 'ROLE_SPECIALIST'), getPatientHistory);
 router.get('/:id/queue-status', authenticate, getQueuePosition);
 
 // Staff / Admin accessible

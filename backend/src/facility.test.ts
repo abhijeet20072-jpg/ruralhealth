@@ -11,20 +11,20 @@ beforeAll(async () => {
   db.exec('DELETE FROM facility_staff; DELETE FROM facilities; DELETE FROM users;');
   
   // Create Admin
-  await request(app).post('/api/auth/register').send({
-    username: 'facility_admin', password: 'password123', role: 'ROLE_FACILITY_ADMIN'
+  await request(app).post('/api/auth/__test_provision').send({
+    username: 'facility_admin', password: 'StrongP@ssw0rd!', role: 'ROLE_FACILITY_ADMIN'
   });
   const adminRes = await request(app).post('/api/auth/login').send({
-    username: 'facility_admin', password: 'password123'
+    username: 'facility_admin', password: 'StrongP@ssw0rd!'
   });
   adminToken = adminRes.body.token;
 
   // Create Citizen
-  await request(app).post('/api/auth/register').send({
-    username: 'citizen_user', password: 'password123', role: 'ROLE_CITIZEN'
+  await request(app).post('/api/auth/__test_provision').send({
+    username: 'citizen_user', password: 'StrongP@ssw0rd!', role: 'ROLE_CITIZEN'
   });
   const citizenRes = await request(app).post('/api/auth/login').send({
-    username: 'citizen_user', password: 'password123'
+    username: 'citizen_user', password: 'StrongP@ssw0rd!'
   });
   citizenToken = citizenRes.body.token;
 });

@@ -8,7 +8,7 @@ import { AuthRequest } from './auth.middleware';
 const syncPayloadSchema = z.object({
   operations: z.array(z.object({
     id: z.string().uuid(),
-    type: z.enum(['CREATE_TRIAGE', 'CREATE_MEDICAL_RECORD', 'UPDATE_APPOINTMENT_STATUS', 'CREATE_REFERRAL', 'UPDATE_TELECONSULTATION_STATUS']),
+    type: z.enum(['CREATE_TRIAGE', 'CREATE_MEDICAL_RECORD', 'UPDATE_APPOINTMENT_STATUS', 'CREATE_REFERRAL', 'UPDATE_TELECONSULTATION_STATUS', 'COMPLETE_CONSULTATION']),
     payload: z.any(),
     timestamp: z.string()
   })).max(50) // Max 50 ops per batch
@@ -127,6 +127,41 @@ export const processSync = (req: AuthRequest, res: Response): void => {
                VALUES (?, ?, ?, ?, ?, ?, ?, 'CREATED', ?)
              `).run(refId, data.patientId, facilityId, data.receivingFacilityId, userId, data.reason, data.priority, data.supportingInfo || null);
              logAudit(userId, 'CREATE_REFERRAL_OFFLINE', refId);
+          
+          } else if (op.type === 'COMPLETE_CONSULTATION') {
+            const schema = z.object({
+              appointmentId: z.string().uuid(),
+              patientId: z.string().uuid(),
+              complaint: z.string().min(1),
+              observations: z.string().optional(),
+              diagnosis: z.string().optional(),
+              prescription: z.array(z.object({
+                medicine: z.string(), dosage: z.string(), frequency: z.string(), duration: z.string()
+              })).optional(),
+              investigations: z.string().optional(),
+              followUp: z.string().optional()
+            });
+            const data = schema.parse(op.payload);
+            
+            // a. Verify Appointment
+            const apt: any = db.prepare(`SELECT * FROM appointments WHERE id = ? AND facilityId = ?`).get(data.appointmentId, facilityId);
+            if (!apt) throw new Error('Appointment not found');
+            if (apt.status === 'COMPLETED') throw new Error('Already completed');
+
+            // b. Update Appointment
+            db.prepare(`UPDATE appointments SET status = 'COMPLETED', queueStatus = 'DONE' WHERE id = ?`).run(data.appointmentId);
+
+            // c. Insert Clinical Records
+            const insertRecord = db.prepare(`INSERT INTO medical_records (id, patientId, doctorId, facilityId, recordType, notes, data) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+            
+            insertRecord.run(crypto.randomUUID(), data.patientId, userId, facilityId, 'CONSULTATION', `Complaint: ${data.complaint}\nObservations: ${data.observations || ''}`, null);
+            if (data.diagnosis) insertRecord.run(crypto.randomUUID(), data.patientId, userId, facilityId, 'DIAGNOSIS', data.diagnosis, null);
+            if (data.prescription && data.prescription.length > 0) insertRecord.run(crypto.randomUUID(), data.patientId, userId, facilityId, 'PRESCRIPTION', 'Medicines prescribed', JSON.stringify(data.prescription));
+            if (data.investigations) insertRecord.run(crypto.randomUUID(), data.patientId, userId, facilityId, 'INVESTIGATION', data.investigations, null);
+            if (data.followUp) insertRecord.run(crypto.randomUUID(), data.patientId, userId, facilityId, 'FOLLOW_UP', data.followUp, null);
+
+            logAudit(userId, 'CONSULTATION_COMPLETED_OFFLINE', data.appointmentId);
+
           } else if (op.type === 'UPDATE_TELECONSULTATION_STATUS') {
             const schema = z.object({
               tcId: z.string(),

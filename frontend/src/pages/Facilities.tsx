@@ -30,10 +30,13 @@ export const Facilities: React.FC = () => {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Healthcare Facilities</h1>
+      <div className="flex justify-between items-start md:items-center flex-col md:flex-row mb-8 gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">{user?.role === 'ROLE_DISTRICT_ADMIN' ? 'District Facilities' : 'Healthcare Facilities'}</h1>
+          <p className="text-slate-500 mt-2">{user?.role === 'ROLE_DISTRICT_ADMIN' ? 'District-level facility directory and oversight.' : 'Discover care and find nearby hospitals, clinics, and health centers.'}</p>
+        </div>
         {isAdmin && (
-          <Link to="/facilities/new" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          <Link to="/facilities/new" className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-md font-semibold transition-colors shadow-sm">
             + Register Facility
           </Link>
         )}
@@ -45,34 +48,40 @@ export const Facilities: React.FC = () => {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by name, type, or service..."
-          className="flex-1 p-3 border rounded shadow-sm"
+          className="flex-1 p-3 border border-slate-300 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-shadow"
         />
-        <button type="submit" className="px-6 py-3 bg-gray-800 text-white rounded hover:bg-gray-900">
-          Search Nearby
+        <button type="submit" className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-md font-semibold transition-colors shadow-sm">
+          {user?.role === 'ROLE_DISTRICT_ADMIN' ? 'Search Directory' : 'Search Nearby'}
         </button>
       </form>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {facilities.map(f => (
-          <div key={f.id} className="bg-white p-6 rounded-lg shadow border border-gray-100 flex flex-col">
+          <div key={f.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex flex-col relative">
             <div className="flex justify-between items-start mb-2">
-              <h3 className="text-xl font-semibold text-blue-900">{f.name}</h3>
-              <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded font-bold">{f.type.replace('_', ' ')}</span>
+              <h3 className="text-lg font-bold text-slate-900 tracking-tight">{f.name}</h3>
+              <span className="text-[10px] px-2 py-1 bg-slate-100 text-slate-600 border border-slate-200 rounded-full font-bold uppercase tracking-wider">{f.type.replace('_', ' ')}</span>
             </div>
-            <p className="text-sm text-gray-500 mb-4">{f.address || 'Address not provided'}</p>
+            <p className="text-sm text-slate-500 mb-4">{f.address || 'Address not provided'}</p>
             
             <div className="flex gap-2 mb-4">
-              {f.emergencyAvailability && <span className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded font-bold">Emergency 24/7</span>}
-              {f.medicineStatus === 'AVAILABLE' && <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded font-bold">Medicines In Stock</span>}
+              {f.emergencyAvailability && <span className="text-xs px-2 py-1 bg-rose-100 text-rose-800 border border-rose-200 rounded-full font-bold">Emergency 24/7</span>}
+              {f.medicineStatus === 'AVAILABLE' && <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-full font-bold">Medicines In Stock</span>}
             </div>
 
-            <div className="mt-auto pt-4 border-t border-gray-100 flex justify-between items-center">
-              <span className="text-sm text-gray-400">{f.distance ? `${f.distance.toFixed(1)} km away` : ''}</span>
-              <Link to={`/facilities/${f.id}`} className="text-blue-600 hover:underline font-medium">View Details &rarr;</Link>
+            <div className="mt-auto pt-4 border-t border-slate-200 flex justify-between items-center">
+              <span className="text-sm text-slate-400">{f.distance ? `${f.distance.toFixed(1)} km away` : ''}</span>
+              <Link to={`/facilities/${f.id}`} className="text-cyan-600 hover:text-cyan-700 font-semibold transition-colors">View Details &rarr;</Link>
             </div>
           </div>
         ))}
-        {facilities.length === 0 && <p className="text-gray-500">No facilities found matching your criteria.</p>}
+        {facilities.length === 0 && (
+          <div className="col-span-full p-12 text-center flex flex-col items-center justify-center bg-white rounded-xl shadow-sm border border-slate-200">
+            <svg className="w-12 h-12 text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+            <h3 className="text-lg font-medium text-slate-900 mb-1">No facilities found</h3>
+            <p className="text-slate-500">There are no facilities matching your current search criteria.</p>
+          </div>
+        )}
       </div>
     </div>
   );

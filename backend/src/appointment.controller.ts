@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { db } from './db';
+import { hasLegitimateCareRelationship } from './auth.utils';
+import { createNotification } from './notification.service';
 import crypto from 'crypto';
 import { AuthRequest } from './auth.middleware';
 
@@ -27,6 +29,20 @@ const VALID_SLOTS = generateSlots();
 export const bookAppointment = (req: AuthRequest, res: Response): void => {
   try {
     const parsed = appointmentSchema.parse(req.body);
+
+    // SECURITY: Citizens can only book for themselves. Staff can book for any patient.
+    if (req.user.role === 'ROLE_CITIZEN') {
+      const citizenPatientRecord = db.prepare('SELECT id FROM patients WHERE userId = ?').get(req.user.id);
+      if (!citizenPatientRecord) {
+        res.status(403).json({ error: 'You must complete your patient profile before booking.' });
+        return;
+      }
+      if (parsed.patientId !== citizenPatientRecord.id) {
+        res.status(403).json({ error: 'You are not authorized to book for another patient.' });
+        return;
+      }
+    }
+
 
     // 1. Facility closed check (No Sundays)
     const d = new Date(parsed.date);
@@ -71,6 +87,19 @@ export const bookAppointment = (req: AuthRequest, res: Response): void => {
 
     try {
       const result = transaction();
+      
+      // Notify Patient
+      const ptUser = db.prepare('SELECT userId FROM patients WHERE id = ?').get(parsed.patientId) as any;
+      if (ptUser && ptUser.userId) {
+        createNotification({
+          recipientUserId: ptUser.userId,
+          type: 'APPOINTMENT_CONFIRMED',
+          title: 'Appointment Confirmed',
+          message: `Your appointment for ${parsed.date} at ${parsed.timeSlot} is confirmed.`,
+          relatedEntityType: 'APPOINTMENT',
+          relatedEntityId: result.id
+        }, false);
+      }
       res.status(201).json({ message: 'Appointment booked', appointmentId: result.id, tokenNumber: result.tokenNumber });
     } catch (err: any) {
       const msg = err.message || '';
@@ -84,9 +113,9 @@ export const bookAppointment = (req: AuthRequest, res: Response): void => {
     }
   } catch (err: any) {
     if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Invalid input data', details: err.errors });
+      res.status(400).json({ error: 'Invalid input data', details: err.issues, message: err.message });
     } else {
-      res.status(500).json({ error: 'Internal server error' });
+      console.error(err); res.status(500).json({ error: 'Internal server error' });
     }
   }
 };
@@ -94,14 +123,43 @@ export const bookAppointment = (req: AuthRequest, res: Response): void => {
 export const cancelAppointment = (req: AuthRequest, res: Response): void => {
   try {
     const id = req.params.id;
+    
+    // Check ownership
+    const apt = db.prepare('SELECT patientId FROM appointments WHERE id = ?').get(id);
+    if (!apt) {
+      res.status(404).json({ error: 'Appointment not found' });
+      return;
+    }
+    
+    if (req.user.role === 'ROLE_CITIZEN') {
+      const citizenPatientRecord = db.prepare('SELECT id FROM patients WHERE userId = ?').get(req.user.id);
+      if (!citizenPatientRecord || citizenPatientRecord.id !== apt.patientId) {
+        res.status(403).json({ error: 'Unauthorized to cancel this appointment' });
+        return;
+      }
+    }
+
     const result = db.prepare(`UPDATE appointments SET status = 'CANCELLED', updatedAt = CURRENT_TIMESTAMP WHERE id = ?`).run(id);
     if (result.changes === 0) {
       res.status(404).json({ error: 'Appointment not found' });
       return;
     }
+    
+    const pt = db.prepare('SELECT p.userId FROM appointments a JOIN patients p ON a.patientId = p.id WHERE a.id = ?').get(id) as any;
+    if (pt && pt.userId) {
+      createNotification({
+        recipientUserId: pt.userId,
+        type: 'APPOINTMENT_CANCELLED',
+        title: 'Appointment Cancelled',
+        message: 'Your appointment has been cancelled.',
+        relatedEntityType: 'APPOINTMENT',
+        relatedEntityId: id,
+        priority: 'HIGH'
+      }, false);
+    }
     res.json({ message: 'Appointment cancelled successfully' });
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.error(err); res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -109,6 +167,14 @@ export const updateQueueStatus = (req: AuthRequest, res: Response): void => {
   try {
     const id = req.params.id;
     const { queueStatus, status } = req.body;
+
+    const appt = db.prepare('SELECT facilityId FROM appointments WHERE id = ?').get(id) as any;
+    if (!appt) {
+      res.status(404).json({ error: 'Appointment not found' }); return;
+    }
+    if (req.user!.role !== 'ROLE_DISTRICT_ADMIN' && appt.facilityId !== req.user!.facilityId) {
+      res.status(403).json({ error: 'Unauthorized to update appointments at this facility' }); return;
+    }
     
     const updates = [];
     const values = [];
@@ -121,7 +187,7 @@ export const updateQueueStatus = (req: AuthRequest, res: Response): void => {
     }
     res.json({ message: 'Queue updated successfully' });
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.error(err); res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -139,13 +205,26 @@ export const getDoctorAvailability = (req: Request, res: Response): void => {
     
     res.json({ availableSlots });
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.error(err); res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 export const getFacilityQueue = (req: AuthRequest, res: Response): void => {
   try {
     const { facilityId, date } = req.query;
+
+    if (!facilityId || !date) {
+      res.status(400).json({ error: 'Missing facilityId or date' });
+      return;
+    }
+
+    // SERVER-SIDE IDOR PROTECTION
+    // If the user is facility-scoped (not District Admin), they MUST match the requested facilityId
+    if (req.user!.role !== 'ROLE_DISTRICT_ADMIN' && req.user!.facilityId !== facilityId) {
+      res.status(403).json({ error: 'Forbidden: You are not authorized to view this facility queue' });
+      return;
+    }
+
     const queue = db.prepare(`
       SELECT a.*, p.firstName, p.lastName 
       FROM appointments a 
@@ -155,13 +234,28 @@ export const getFacilityQueue = (req: AuthRequest, res: Response): void => {
     `).all(facilityId, date);
     res.json({ queue });
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.error(err); res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 export const getPatientHistory = (req: AuthRequest, res: Response): void => {
   try {
     const patientId = req.params.patientId;
+
+    if (req.user!.role === 'ROLE_CITIZEN') {
+      const citizenPatientRecord: any = db.prepare('SELECT id FROM patients WHERE userId = ?').get(req.user!.id);
+      if (!citizenPatientRecord || citizenPatientRecord.id !== patientId) {
+        res.status(403).json({ error: 'Unauthorized to access this patient history' });
+        return;
+      }
+    } else if (req.user!.role !== 'ROLE_DISTRICT_ADMIN') {
+      const facilityId = req.user!.facilityId;
+      if (!facilityId || !hasLegitimateCareRelationship(patientId, facilityId)) {
+        res.status(403).json({ error: 'Unauthorized: No active care relationship with this patient at your facility' });
+        return;
+      }
+    }
+
     const history = db.prepare(`
       SELECT a.*, f.name as facilityName, u.username as doctorName
       FROM appointments a
@@ -172,7 +266,7 @@ export const getPatientHistory = (req: AuthRequest, res: Response): void => {
     `).all(patientId);
     res.json({ history });
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.error(err); res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -201,6 +295,6 @@ export const getQueuePosition = (req: AuthRequest, res: Response): void => {
       estimatedWaitTime: `${estimatedWaitMinutes} minutes`
     });
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.error(err); res.status(500).json({ error: 'Internal server error' });
   }
 };

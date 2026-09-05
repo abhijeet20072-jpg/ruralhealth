@@ -34,7 +34,7 @@ export const registerFacility = (req: Request, res: Response): void => {
     res.status(201).json({ message: 'Facility registered successfully', facilityId: id });
   } catch (err: any) {
     if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Invalid facility data', details: err.errors });
+      res.status(400).json({ error: 'Invalid facility data', details: err.issues });
     } else {
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -71,7 +71,7 @@ export const updateFacility = (req: Request, res: Response): void => {
     res.json({ message: 'Facility updated successfully' });
   } catch (err: any) {
     if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Invalid facility data', details: err.errors });
+      res.status(400).json({ error: 'Invalid facility data', details: err.issues });
     } else {
       res.status(500).json({ error: 'Internal server error' });
     }

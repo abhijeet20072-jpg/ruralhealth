@@ -4,6 +4,19 @@ import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConnectivity } from '../context/ConnectivityContext';
 
+
+const getTypeStyles = (type: string) => {
+  switch(type) {
+    case 'CONSULTATION': return 'bg-cyan-100 text-cyan-700 border-cyan-200';
+    case 'TRIAGE': return 'bg-amber-100 text-amber-700 border-amber-200';
+    case 'PRESCRIPTION': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+    case 'DIAGNOSTIC': return 'bg-purple-100 text-purple-700 border-purple-200';
+    case 'REFERRAL': return 'bg-orange-100 text-orange-700 border-orange-200';
+    case 'EMERGENCY': return 'bg-red-100 text-red-700 border-red-200';
+    default: return 'bg-slate-100 text-slate-700 border-slate-200';
+  }
+};
+
 export const MedicalRecords: React.FC = () => {
   const { id } = useParams<{ id: string }>(); // Patient ID
   const { user } = useAuth();
@@ -57,8 +70,8 @@ export const MedicalRecords: React.FC = () => {
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <Link to={`/patients/${id}`} className="text-blue-600 hover:underline mb-6 inline-block">&larr; Back to Patient Profile</Link>
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Longitudinal Medical Records</h1>
+      <Link to={`/patients/${id}`} className="text-cyan-600 hover:underline mb-6 inline-block">&larr; Back to Patient Profile</Link>
+      <h1 className="text-3xl font-bold text-slate-800 mb-6">Longitudinal Medical Records</h1>
       
       {error && <div className="p-4 mb-6 bg-red-50 text-red-700 rounded font-bold border border-red-200">{error}</div>}
 
@@ -66,21 +79,21 @@ export const MedicalRecords: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           <h2 className="text-xl font-bold border-b pb-2">Clinical Timeline</h2>
           {timeline.length === 0 ? (
-            <p className="text-gray-500 italic">No medical records found for this patient.</p>
+            <p className="text-slate-500 italic">No medical records found for this patient.</p>
           ) : (
             <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent">
               {timeline.map(record => (
                 <div key={record.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-blue-100 text-blue-600 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow">
+                  <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10 ${getTypeStyles(record.recordType)}`}>
                     <span className="font-bold text-xs">{record.recordType.charAt(0)}</span>
                   </div>
-                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded border shadow-sm">
+                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-start mb-1">
-                      <span className="font-bold text-indigo-700">{record.recordType.replace('_', ' ')}</span>
-                      <span className="text-xs text-gray-500">{new Date(record.createdAt).toLocaleDateString()}</span>
+                      <span className={`font-bold text-sm tracking-wide uppercase ${getTypeStyles(record.recordType).split(' ')[1]}`}>{record.recordType.replace('_', ' ')}</span>
+                      <span className="text-xs text-slate-500">{new Date(record.createdAt).toLocaleDateString()}</span>
                     </div>
-                    <p className="text-gray-700 text-sm mb-3">{record.notes}</p>
-                    <div className="text-xs text-gray-500 flex justify-between border-t pt-2">
+                    <p className="text-slate-700 text-sm mb-3">{record.notes}</p>
+                    <div className="text-xs text-slate-500 flex justify-between border-t pt-2">
                       <span>Dr. {record.doctorName}</span>
                       <span>{record.facilityName}</span>
                     </div>
@@ -93,11 +106,11 @@ export const MedicalRecords: React.FC = () => {
 
         {isClinical && (
           <div>
-            <div className="bg-gray-50 p-6 rounded-lg border shadow-sm sticky top-8">
+            <div className="bg-slate-50 p-6 rounded-lg border shadow-sm sticky top-8">
               <h2 className="text-lg font-bold mb-4">Add Clinical Record</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Record Type</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Record Type</label>
                   <select value={recordType} onChange={e => setRecordType(e.target.value)} className="w-full p-2 border rounded text-sm">
                     <option value="CONSULTATION">Consultation</option>
                     <option value="DIAGNOSIS">Diagnosis</option>
@@ -109,10 +122,10 @@ export const MedicalRecords: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Clinical Notes</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Clinical Notes</label>
                   <textarea required rows={4} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Enter detailed clinical notes..." className="w-full p-2 border rounded text-sm"></textarea>
                 </div>
-                <button type="submit" className="w-full py-2 bg-indigo-600 text-white rounded font-bold hover:bg-indigo-700 transition">
+                <button type="submit" className="w-full py-2 bg-cyan-600 text-white rounded font-bold hover:bg-cyan-700 transition">
                   Append to EHR
                 </button>
               </form>

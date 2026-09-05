@@ -11,10 +11,10 @@ const patientSchema = z.object({
   lastName: z.string().min(1),
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format, use YYYY-MM-DD"),
   gender: z.enum(['MALE', 'FEMALE', 'OTHER']),
-  phoneNumber: z.string().optional(),
+  phoneNumber: z.string().regex(/^[6-9]\d{9}$/, "Invalid Indian mobile number").optional().or(z.literal('')),
   address: z.string().optional(),
   emergencyContactName: z.string().optional(),
-  emergencyContactPhone: z.string().optional(),
+  emergencyContactPhone: z.string().regex(/^[6-9]\d{9}$/, "Invalid Indian mobile number").optional().or(z.literal('')),
   bloodGroup: z.string().optional(),
   allergies: z.array(z.string()).default([])
 });
@@ -35,6 +35,14 @@ export const registerPatient = (req: AuthRequest, res: Response): void => {
     const id = crypto.randomUUID();
     const isCitizen = req.user!.role === 'ROLE_CITIZEN';
 
+    if (isCitizen) {
+      const existingProfile = db.prepare('SELECT id FROM patients WHERE userId = ?').get(userId);
+      if (existingProfile) {
+        res.status(409).json({ error: 'You already have a patient profile linked to this account.' });
+        return;
+      }
+    }
+
     db.prepare(`
       INSERT INTO patients 
       (id, abhaId, firstName, lastName, dateOfBirth, gender, phoneNumber, address, emergencyContactName, emergencyContactPhone, bloodGroup, allergies, userId) 
@@ -49,8 +57,8 @@ export const registerPatient = (req: AuthRequest, res: Response): void => {
     logAudit(userId, 'REGISTER_PATIENT', id, { abhaId: parsed.abhaId });
     res.status(201).json({ message: 'Patient registered successfully', patientId: id });
   } catch (err: any) {
-    if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Invalid patient data', details: err.errors });
+    console.log('CATCH BLOCK HIT', err); if (err.name === 'ZodError') {
+      res.status(400).json({ error: 'Invalid patient data', details: err.issues, message: err.message });
     } else {
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -61,6 +69,14 @@ export const updatePatient = (req: AuthRequest, res: Response): void => {
   try {
     const id = req.params.id;
     const userId = req.user!.id;
+
+    if (req.user!.role === 'ROLE_CITIZEN') {
+      const myProfile = db.prepare('SELECT id FROM patients WHERE userId = ?').get(userId);
+      if (!myProfile || myProfile.id !== id) {
+        res.status(403).json({ error: 'Unauthorized to update this profile' });
+        return;
+      }
+    }
     const parsed = patientSchema.partial().parse(req.body);
 
     const patient: any = db.prepare('SELECT * FROM patients WHERE id = ?').get(id);
@@ -93,8 +109,8 @@ export const updatePatient = (req: AuthRequest, res: Response): void => {
     logAudit(userId, 'UPDATE_PATIENT', id, Object.keys(parsed));
     res.json({ message: 'Patient updated successfully' });
   } catch (err: any) {
-    if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Invalid patient data', details: err.errors });
+    if (err.name === 'ZodError') {
+      res.status(400).json({ error: 'Invalid patient data', details: err.issues, message: err.message });
     } else {
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -137,6 +153,14 @@ export const getPatientDetails = (req: AuthRequest, res: Response): void => {
   try {
     const id = req.params.id;
     const userId = req.user!.id;
+    
+    if (req.user!.role === 'ROLE_CITIZEN') {
+      const myProfile = db.prepare('SELECT id FROM patients WHERE userId = ?').get(userId);
+      if (!myProfile || myProfile.id !== id) {
+        res.status(403).json({ error: 'Unauthorized to view this profile' });
+        return;
+      }
+    }
 
     const patient: any = db.prepare('SELECT * FROM patients WHERE id = ?').get(id);
     

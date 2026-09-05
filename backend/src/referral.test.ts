@@ -20,18 +20,18 @@ beforeAll(async () => {
   db.exec('DELETE FROM referrals; DELETE FROM facility_staff; DELETE FROM facilities; DELETE FROM patients; DELETE FROM users;');
   
   // Referring Doctor (e.g. MO at PHC)
-  await request(app).post('/api/auth/register').send({ username: 'refDoc', password: 'password123', role: 'ROLE_DOCTOR_MO' });
-  referringToken = (await request(app).post('/api/auth/login').send({ username: 'refDoc', password: 'password123' })).body.token;
+  await request(app).post('/api/auth/__test_provision').send({ username: 'refDoc', password: 'StrongP@ssw0rd!', role: 'ROLE_DOCTOR_MO' });
+  referringToken = (await request(app).post('/api/auth/login').send({ username: 'refDoc', password: 'StrongP@ssw0rd!' })).body.token;
   refDocId = db.prepare("SELECT id FROM users WHERE username = 'refDoc'").get().id;
 
   // Receiving Specialist (e.g. at District Hospital)
-  await request(app).post('/api/auth/register').send({ username: 'recDoc', password: 'password123', role: 'ROLE_SPECIALIST' });
-  receivingToken = (await request(app).post('/api/auth/login').send({ username: 'recDoc', password: 'password123' })).body.token;
+  await request(app).post('/api/auth/__test_provision').send({ username: 'recDoc', password: 'StrongP@ssw0rd!', role: 'ROLE_SPECIALIST' });
+  receivingToken = (await request(app).post('/api/auth/login').send({ username: 'recDoc', password: 'StrongP@ssw0rd!' })).body.token;
   recDocId = db.prepare("SELECT id FROM users WHERE username = 'recDoc'").get().id;
 
   // District Admin
-  await request(app).post('/api/auth/register').send({ username: 'admin1', password: 'password123', role: 'ROLE_DISTRICT_ADMIN' });
-  adminToken = (await request(app).post('/api/auth/login').send({ username: 'admin1', password: 'password123' })).body.token;
+  await request(app).post('/api/auth/__test_provision').send({ username: 'admin1', password: 'StrongP@ssw0rd!', role: 'ROLE_DISTRICT_ADMIN' });
+  adminToken = (await request(app).post('/api/auth/login').send({ username: 'admin1', password: 'StrongP@ssw0rd!' })).body.token;
 
   // Facilities
   refFacilityId = crypto.randomUUID();
